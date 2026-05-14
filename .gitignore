@@ -44,3 +44,8 @@ yarn-error.log*
 next-env.d.ts
 
 /lib/generated/prisma
+
+# SQLite dev database — not suitable for production/serverless
+prisma/*.db
+prisma/*.db-shm
+prisma/*.db-wal

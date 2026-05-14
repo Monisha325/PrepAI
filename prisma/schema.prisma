@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model InterviewSession {
@@ -22,9 +22,9 @@ model InterviewSession {
 }
 
 model Question {
-  id          String            @id @default(cuid())
+  id          String             @id @default(cuid())
   sessionId   String
-  session     InterviewSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session     InterviewSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   type        String
   difficulty  String
   text        String
@@ -36,18 +36,18 @@ model Question {
 }
 
 model ResumeAnalysis {
-  id               String   @id @default(cuid())
-  userId           String
-  filename         String
-  atsScore         Int
-  sectionScores    String
-  matchedKeywords  String
-  missingKeywords  String
-  suggestions      String
-  extractedName    String
-  extractedRole    String
-  skills           String
-  createdAt        DateTime @default(now())
+  id              String   @id @default(cuid())
+  userId          String
+  filename        String
+  atsScore        Int
+  sectionScores   String
+  matchedKeywords String
+  missingKeywords String
+  suggestions     String
+  extractedName   String
+  extractedRole   String
+  skills          String
+  createdAt       DateTime @default(now())
 
   @@index([userId])
 }
