@@ -69,3 +69,11 @@ model AnswerEvaluation {
 
   @@index([questionId])
 }
+
+model UserStreak {
+  userId           String   @id
+  currentStreak    Int      @default(0)
+  longestStreak    Int      @default(0)
+  lastActivityDate String?
+  updatedAt        DateTime @updatedAt
+}

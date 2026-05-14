@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { groq, GROQ_MODEL } from "@/lib/groq";
 import { db } from "@/lib/db";
+import { updateUserStreak } from "@/lib/streak";
 
 export interface GenerateRequestBody {
   role: string;
@@ -173,6 +174,7 @@ export async function POST(req: NextRequest) {
         session.questions.forEach((dbQ, i) => {
           if (questions[i]) questions[i].dbId = dbQ.id;
         });
+        await updateUserStreak(userId);
       } catch {
         // DB unavailable — return questions without persisting
       }
