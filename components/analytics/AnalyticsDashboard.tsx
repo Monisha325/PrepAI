@@ -67,16 +67,15 @@ function getLast14Days(): string[] {
 function computeStreak(activeDateKeys: string[]): number {
   if (!activeDateKeys.length) return 0;
   const keys = new Set(activeDateKeys);
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   let streak = 0;
-  const today = new Date();
-  for (let i = 0; i < 365; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    if (keys.has(d.toISOString().slice(0, 10))) {
-      streak++;
-    } else if (i > 0) {
-      break;
-    }
+  const startDay = keys.has(today) ? today : keys.has(yesterday) ? yesterday : null;
+  if (!startDay) return 0;
+  const d = new Date(startDay + "T12:00:00Z");
+  while (keys.has(d.toISOString().slice(0, 10))) {
+    streak++;
+    d.setUTCDate(d.getUTCDate() - 1);
   }
   return streak;
 }
@@ -474,10 +473,13 @@ function WeakTopicsPanel({ dimensions }: { dimensions: DimensionPoint[] }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+interface DbStreak { current: number; longest: number; lastActivity: string | null; }
+
 export function AnalyticsDashboard() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [range, setRange] = useState<TimeRange>("30d");
+  const [dbStreak, setDbStreak] = useState<DbStreak | null>(null);
 
   useEffect(() => {
     const evals = loadEvaluations();
@@ -486,9 +488,20 @@ export function AnalyticsDashboard() {
     setLoading(false);
   }, [range]);
 
+  useEffect(() => {
+    fetch("/api/streak")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s: DbStreak | null) => {
+        if (s && typeof s.current === "number") setDbStreak(s);
+      })
+      .catch(() => {});
+  }, []);
+
   if (loading) return <LoadingState />;
 
   const d = data!;
+  const effectiveStreak = dbStreak?.current ?? d.streak;
+  const effectiveData = dbStreak ? { ...d, streak: dbStreak.current } : d;
 
   const stats = [
     {
@@ -520,8 +533,8 @@ export function AnalyticsDashboard() {
     },
     {
       label: "Streak",
-      value: d.streak > 0 ? `${d.streak}d` : "—",
-      sub: d.activeDays > 0 ? `${d.activeDays} active day${d.activeDays !== 1 ? "s" : ""}` : "Practice daily",
+      value: effectiveStreak > 0 ? `${effectiveStreak}d` : "—",
+      sub: dbStreak?.longest ? `Best: ${dbStreak.longest}d` : d.activeDays > 0 ? `${d.activeDays} active day${d.activeDays !== 1 ? "s" : ""}` : "Practice daily",
       icon: Flame,
       color: "text-rose-400",
       bg: "bg-rose-500/10",
@@ -686,7 +699,7 @@ export function AnalyticsDashboard() {
       </div>
 
       {/* AI Insights */}
-      <InsightsPanel data={d} />
+      <InsightsPanel data={effectiveData} />
 
       {/* Recent evaluations table */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card">

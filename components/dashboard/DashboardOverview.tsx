@@ -53,16 +53,20 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function calculateStreak(evals: Eval[]): number {
+interface StreakData { current: number; longest: number; lastActivity: string | null; }
+
+function calculateLocalStreak(evals: Eval[]): number {
   if (!evals.length) return 0;
-  const dates = new Set(evals.map((e) => new Date(e.answeredAt).toDateString()));
+  const keys = new Set(evals.map((e) => e.answeredAt.slice(0, 10)));
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   let streak = 0;
-  const today = new Date();
-  for (let i = 0; i < 365; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    if (dates.has(d.toDateString())) streak++;
-    else break;
+  const startDay = keys.has(today) ? today : keys.has(yesterday) ? yesterday : null;
+  if (!startDay) return 0;
+  const d = new Date(startDay + "T12:00:00Z");
+  while (keys.has(d.toISOString().slice(0, 10))) {
+    streak++;
+    d.setUTCDate(d.getUTCDate() - 1);
   }
   return streak;
 }
@@ -211,6 +215,7 @@ export function DashboardOverview() {
   const [jobs,        setJobs]        = useState<Job[]>([]);
   const [scans,       setScans]       = useState<ResumeScan[]>([]);
   const [loaded,      setLoaded]      = useState(false);
+  const [streakData,  setStreakData]  = useState<StreakData | null>(null);
 
   useEffect(() => {
     setEvals(load<Eval>(EVALS_KEY));
@@ -218,6 +223,13 @@ export function DashboardOverview() {
     setJobs(load<Job>(JOBS_KEY));
     setScans(load<ResumeScan>(SCANS_KEY));
     setLoaded(true);
+
+    fetch("/api/streak")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: StreakData | null) => {
+        if (data && typeof data.current === "number") setStreakData(data);
+      })
+      .catch(() => {});
   }, []);
 
   if (!loaded) {
@@ -247,13 +259,16 @@ export function DashboardOverview() {
   const avgScore    = totalEvals
     ? Math.round(evals.reduce((sum, e) => sum + e.overallScore, 0) / totalEvals)
     : null;
-  const streak      = calculateStreak(evals);
+  const localStreak = calculateLocalStreak(evals);
+  const streak      = streakData?.current ?? localStreak;
+  const longest     = streakData?.longest ?? 0;
   const activeJobs  = jobs.filter((j) => j.status !== "Offer" && j.status !== "Rejected").length;
 
   const statCards = [
     {
       label: "Questions Answered",
       value: String(totalEvals),
+      sub:   undefined as string | undefined,
       icon:  Target,
       color: "text-indigo-400",
       bg:    "bg-indigo-500/10",
@@ -262,6 +277,7 @@ export function DashboardOverview() {
     {
       label: "Avg Score",
       value: avgScore !== null ? `${avgScore}%` : "—",
+      sub:   undefined as string | undefined,
       icon:  TrendingUp,
       color: "text-emerald-400",
       bg:    "bg-emerald-500/10",
@@ -270,6 +286,7 @@ export function DashboardOverview() {
     {
       label: "Day Streak",
       value: String(streak),
+      sub:   longest > 0 ? `Best: ${longest}d` : undefined,
       icon:  Flame,
       color: "text-amber-400",
       bg:    "bg-amber-500/10",
@@ -278,6 +295,7 @@ export function DashboardOverview() {
     {
       label: "Active Applications",
       value: String(activeJobs),
+      sub:   undefined as string | undefined,
       icon:  Briefcase,
       color: "text-violet-400",
       bg:    "bg-violet-500/10",
@@ -313,6 +331,7 @@ export function DashboardOverview() {
             </div>
             <p className="mb-0.5 text-xs font-medium text-muted-foreground">{s.label}</p>
             <p className={`text-2xl font-black tracking-tight ${s.color}`}>{s.value}</p>
+            {s.sub && <p className="mt-0.5 text-[11px] text-muted-foreground">{s.sub}</p>}
           </div>
         ))}
       </div>
