@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model InterviewSession {
+  id             String     @id @default(cuid())
+  userId         String
+  role           String
+  experience     String
+  skills         String
+  interviewTypes String
+  totalCount     Int
+  questions      Question[]
+  createdAt      DateTime   @default(now())
+
+  @@index([userId])
+}
+
+model Question {
+  id          String            @id @default(cuid())
+  sessionId   String
+  session     InterviewSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  type        String
+  difficulty  String
+  text        String
+  hint        String
+  order       Int
+  evaluations AnswerEvaluation[]
+
+  @@index([sessionId])
+}
+
+model ResumeAnalysis {
+  id               String   @id @default(cuid())
+  userId           String
+  filename         String
+  atsScore         Int
+  sectionScores    String
+  matchedKeywords  String
+  missingKeywords  String
+  suggestions      String
+  extractedName    String
+  extractedRole    String
+  skills           String
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+}
+
+model AnswerEvaluation {
+  id                 String   @id @default(cuid())
+  questionId         String
+  question           Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answer             String
+  overallScore       Int
+  technicalScore     Int
+  communicationScore Int
+  relevanceScore     Int
+  confidenceScore    Int
+  strengths          String
+  improvements       String
+  summary            String
+  createdAt          DateTime @default(now())
+
+  @@index([questionId])
+}
