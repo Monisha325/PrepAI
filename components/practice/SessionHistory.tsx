@@ -5,7 +5,7 @@ import { Clock, RotateCcw, Trash2 } from "lucide-react";
 import type { GenerateResponse } from "@/app/api/generate-questions/route";
 
 export type StoredSession = Omit<GenerateResponse, "questions"> & {
-  questions: Array<{ id: string; type: string; difficulty: string; text: string; hint: string; order: number }>;
+  questions: Array<{ id: string; dbId?: string; type: string; difficulty: string; text: string; hint: string; order: number }>;
 };
 
 const STORAGE_KEY = "prepai_sessions";
@@ -14,11 +14,13 @@ const MAX_STORED = 10;
 export function saveSession(session: GenerateResponse) {
   try {
     const existing = loadSessions();
-    const updated = [session, ...existing.filter((s) => s.sessionId !== session.sessionId)].slice(
-      0,
-      MAX_STORED,
-    );
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    let updated: StoredSession[];
+    if (session.sessionId !== null) {
+      updated = [session, ...existing.filter((s) => s.sessionId !== session.sessionId)];
+    } else {
+      updated = [session, ...existing];
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated.slice(0, MAX_STORED)));
   } catch {}
 }
 
@@ -64,13 +66,29 @@ export function SessionHistory({ onRestore }: Props) {
   const [sessions, setSessions] = useState<StoredSession[]>([]);
 
   useEffect(() => {
-    setSessions(loadSessions());
+    const local = loadSessions();
+    setSessions(local);
+
+    fetch("/api/interview-sessions")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { sessions?: StoredSession[] } | null) => {
+        if (!data?.sessions?.length) return;
+        setSessions((prev) => {
+          const localKeys = new Set(prev.map((s) => s.sessionId).filter(Boolean));
+          const dbOnly = data.sessions!.filter((s) => s.sessionId && !localKeys.has(s.sessionId));
+          if (!dbOnly.length) return prev;
+          return [...prev, ...dbOnly].slice(0, MAX_STORED);
+        });
+      })
+      .catch(() => {});
   }, []);
 
-  function remove(sessionId: string | null) {
-    const updated = sessions.filter((s) => s.sessionId !== sessionId);
+  function remove(session: StoredSession) {
+    const key = session.sessionId ?? session.createdAt;
+    const updated = sessions.filter((s) => (s.sessionId ?? s.createdAt) !== key);
     setSessions(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    const localOnly = loadSessions().filter((s) => (s.sessionId ?? s.createdAt) !== key);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(localOnly));
   }
 
   if (!sessions.length) return null;
@@ -128,7 +146,7 @@ export function SessionHistory({ onRestore }: Props) {
                   <RotateCcw className="h-3 w-3" />
                 </button>
                 <button
-                  onClick={() => remove(s.sessionId)}
+                  onClick={() => remove(s)}
                   title="Delete this session"
                   className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
                 >

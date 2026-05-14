@@ -145,6 +145,7 @@ export function AnswerEvaluator({ question, role, experience, sessionKey, onClos
       difficulty: question.difficulty,
       role,
       experience,
+      ...(question.dbId && { dbQuestionId: question.dbId }),
     };
 
     try {

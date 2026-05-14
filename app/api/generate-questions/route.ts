@@ -13,6 +13,7 @@ export interface GenerateRequestBody {
 
 export interface GeneratedQuestion {
   id: string;
+  dbId?: string;
   type: string;
   difficulty: string;
   text: string;
@@ -164,8 +165,14 @@ export async function POST(req: NextRequest) {
               })),
             },
           },
+          include: {
+            questions: { orderBy: { order: "asc" } },
+          },
         });
         sessionId = session.id;
+        session.questions.forEach((dbQ, i) => {
+          if (questions[i]) questions[i].dbId = dbQ.id;
+        });
       } catch {
         // DB unavailable — return questions without persisting
       }

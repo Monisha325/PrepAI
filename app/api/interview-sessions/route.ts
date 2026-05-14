@@ -21,23 +21,29 @@ export async function GET() {
       take: 20,
       include: {
         questions: {
-          select: { id: true, type: true, difficulty: true },
+          select: { id: true, type: true, difficulty: true, text: true, hint: true, order: true },
+          orderBy: { order: "asc" },
         },
       },
     });
 
     const result = sessions.map((s) => ({
-      id: s.id,
+      sessionId: s.id,
       role: s.role,
       experience: s.experience,
       skills: JSON.parse(s.skills) as string[],
       interviewTypes: JSON.parse(s.interviewTypes) as string[],
       totalCount: s.totalCount,
       createdAt: s.createdAt.toISOString(),
-      typeCounts: s.questions.reduce<Record<string, number>>((acc, q) => {
-        acc[q.type] = (acc[q.type] ?? 0) + 1;
-        return acc;
-      }, {}),
+      questions: s.questions.map((q) => ({
+        id: `q_${q.order}`,
+        dbId: q.id,
+        type: q.type,
+        difficulty: q.difficulty,
+        text: q.text,
+        hint: q.hint,
+        order: q.order,
+      })),
     }));
 
     return NextResponse.json({ sessions: result });

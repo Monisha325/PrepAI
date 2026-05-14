@@ -228,6 +228,7 @@ function InterviewMode({
       difficulty: q.difficulty,
       role: session.role,
       experience: session.experience,
+      ...(q.dbId && { dbQuestionId: q.dbId }),
     };
 
     try {
@@ -565,12 +566,28 @@ function InterviewMode({
 
 // ─── EvaluateHub root ─────────────────────────────────────────────────────────
 
+function mergeWithDb(setter: React.Dispatch<React.SetStateAction<StoredSession[]>>) {
+  fetch("/api/interview-sessions")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data: { sessions?: StoredSession[] } | null) => {
+      if (!data?.sessions?.length) return;
+      setter((prev) => {
+        const localKeys = new Set(prev.map((s) => s.sessionId).filter(Boolean));
+        const dbOnly = data.sessions!.filter((s) => s.sessionId && !localKeys.has(s.sessionId));
+        if (!dbOnly.length) return prev;
+        return [...prev, ...dbOnly].slice(0, 20);
+      });
+    })
+    .catch(() => {});
+}
+
 export function EvaluateHub() {
   const [sessions, setSessions] = useState<StoredSession[]>([]);
   const [selected, setSelected] = useState<StoredSession | null>(null);
 
   useEffect(() => {
     setSessions(loadStoredSessions());
+    mergeWithDb(setSessions);
   }, []);
 
   if (selected) {
@@ -579,7 +596,8 @@ export function EvaluateHub() {
         session={selected}
         onBack={() => {
           setSelected(null);
-          setSessions(loadStoredSessions()); // refresh to pick up any new sessions
+          setSessions(loadStoredSessions());
+          mergeWithDb(setSessions);
         }}
       />
     );
